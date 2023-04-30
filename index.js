@@ -6,6 +6,7 @@ const ytdl = require('ytdl-core-discord');
 const { Readable } = require('stream');
 const SpottyDL = require('spottydl');
 const { resourceLimits } = require('worker_threads');
+const play = require('play-dl');
 
 
 // Set up the Discord bot client
@@ -92,7 +93,7 @@ async function playSong(guild, connection, song) {
     },
   });
   const stream = await getStreamFromSpotify(song);
-  const resource = createAudioResource(stream);
+  const resource = createAudioResource(stream.stream);
   
   connection.subscribe(player);
   player.play(resource);
@@ -137,10 +138,14 @@ async function getStreamFromSpotify(track) {
     })
 
 
-  const stream = await ytdl("https://www.youtube.com/watch?v="+videoID, {
-    filter: 'audioonly',
-    highWaterMark: 1 << 25
-  });
+  // const stream = await ytdl("https://www.youtube.com/watch?v="+videoID, {
+  //   filter: 'audioonly',
+  //   highWaterMark: 1 << 25
+  // });
+  const stream = await play.stream("https://www.youtube.com/watch?v="+videoID, {
+    discordPlayerCompatibility: true,
+    quality: 2,
+  })
 
   return stream
   // if (!trackPreviewUrl) {
