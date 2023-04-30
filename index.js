@@ -1,3 +1,4 @@
+require('dotenv/config')
 const {Client, IntentsBitField } = require('discord.js');
 const { joinVoiceChannel, demuxProbe, createAudioPlayer, NoSubscriberBehavior, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const SpotifyWebApi = require('spotify-web-api-node');
@@ -22,8 +23,8 @@ client.on('ready', () => {
 
 // Set up the Spotify API client credentials
 const spotifyApi = new SpotifyWebApi({
-  clientId: '7a74d499495b4b7087ac02ab4511df30',
-  clientSecret: 'ad370f9370ba4a7ab105e977fd66288c'
+  clientId: process.env.CLIENT_ID,
+  clientSecret: process.env.CLIENT_SECRET
 });
 
 // Set up the Spotify access token
@@ -158,4 +159,4 @@ async function getStreamFromSpotify(track) {
 }
 
 // Log in to the Discord bot client
-client.login('MTEwMDY4OTI1MTk0OTEwNTIwMg.G4lRok.-siLXVdgG6fHfPhJSZaPql-Pr-2uG-dpeB7aJA');
+client.login(process.env.TOKEN);
