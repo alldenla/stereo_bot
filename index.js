@@ -1,6 +1,6 @@
 require('dotenv/config')
 const {Client, IntentsBitField } = require('discord.js');
-const { joinVoiceChannel, demuxProbe, createAudioPlayer, NoSubscriberBehavior, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const SpotifyWebApi = require('spotify-web-api-node');
 const ytdl = require('ytdl-core-discord');
 const { Readable } = require('stream');
@@ -43,22 +43,35 @@ spotifyApi.clientCredentialsGrant()
 
 // Set up the music queue
 const queue = new Map();
-
+const player = createAudioPlayer({
+    behaviours: {
+      noSubscriber: NoSubscriberBehavior.Pause,
+    },
+  });
 // Define the 'play' command for the bot
 client.on('messageCreate', async (message) => {
   if (!message.content.startsWith('!play')) return;
-
+  let track = null;
   const query = message.content.slice(6).trim();
 
   // Search for tracks on Spotify
-  const searchResults = await spotifyApi.searchTracks(query, { limit: 1, market: 'US' });
-
-  if (!searchResults.body.tracks.items.length) {
-    message.channel.send('No tracks found!');
-    return;
+  if(query.startsWith('https://')){
+    const trackid = query.split('?')[0].split('/').pop();
+    const searchResults = await spotifyApi.getTrack(trackid, {market: "SG"})
+    track = searchResults.body;
+    console.log(track)
   }
 
-  const track = searchResults.body.tracks.items[0];
+  else {const searchResults = await spotifyApi.searchTracks(query, { limit: 1, market: "SG" });
+
+    if (!searchResults.body.tracks.items.length) {
+      message.channel.send('No tracks found!');
+      return;
+    }
+
+    track = searchResults.body.tracks.items[0];
+    console.log(track);
+  }
   // Play the track in the voice channel
   const connection = await joinVoiceChannel({
     channelId: message.member.voice.channelId,
@@ -76,7 +89,7 @@ client.on('messageCreate', async (message) => {
   const serverQueue = queue.get(message.guild.id) || { songs: [] };
   serverQueue.songs.push(track);
   queue.set(message.guild.id, serverQueue);
-  console.log(serverQueue.songs)
+  // console.log(serverQueue.songs)
 
   if (serverQueue.songs.length === 1) {
     playSong(message.guild, connection, serverQueue.songs[0]);
@@ -86,17 +99,45 @@ client.on('messageCreate', async (message) => {
   message.channel.send(`Now playing: ${track.name} by ${track.artists[0].name}`);
 });
 
+
+client.on('messageCreate', async (message) => {
+  if (!message.content.startsWith('!stop')) return;
+  const connection = getVoiceConnection(message.guild.id);
+  connection.destroy();
+});
+
+client.on('messageCreate', async (message) => {
+  if (!message.content.startsWith('!next')) return;
+  const connection = getVoiceConnection(message.guild.id);
+  const serverQueue = queue.get(message.guild.id);
+  serverQueue.songs.splice(0,1);
+  console.log(serverQueue.songs)
+  if (serverQueue.songs.length > 0) {
+    playSong(message.guild, connection, serverQueue.songs[0]);
+  } else {
+    connection.destroy();
+    queue.delete(guild.id);
+  }
+});
+
+client.on('messageCreate', async (message) => {
+  if (!message.content.startsWith('!pause')) return;
+  player.pause()
+});
+
+client.on('messageCreate', async (message) => {
+  if (!message.content.startsWith('!unpause')) return;
+  player.unpause()
+});
+
+
 async function playSong(guild, connection, song) {
-  const player = createAudioPlayer({
-    behaviours: {
-      noSubscriber: NoSubscriberBehavior.Pause,
-    },
-  });
+  
   const stream = await getStreamFromSpotify(song);
   const resource = createAudioResource(stream.stream);
-  
-  connection.subscribe(player);
   player.play(resource);
+  connection.subscribe(player);
+  // player.play(resource);
 
   // const dispatcher = connection.play(stream, { type: 'opus' });
 
@@ -107,8 +148,7 @@ async function playSong(guild, connection, song) {
     if (serverQueue.songs.length > 0) {
       playSong(guild, connection, serverQueue.songs[0]);
     } else {
-      console.log("unplayable")
-      connection.disconnect();
+      setTimeout(() =>   connection.destroy(), 5_000);
       queue.delete(guild.id);
     }
   })
