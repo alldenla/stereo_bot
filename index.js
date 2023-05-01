@@ -163,24 +163,26 @@ client.on('messageCreate', async (message) => {
 
 client.on('messageCreate', async (message) => {
   if (!message.content.startsWith('!shuffle')) return;
-  const serverQueue = queue.get(message.guild.id);
+  const serverQueue = queue.get(message.guild.id); // this is block level, it will make it undefined
   const queueArr = JSON.parse(JSON.stringify(serverQueue.songs));
   queueArr.shift();
   shuffle(queueArr);
   serverQueue.songs.splice(1);
   queueArr.forEach(t=>serverQueue.songs.push(t));
   console.log("shuffled");
+  message.channel.send('Shuffled the Queue.')
 })
 
 
 
 async function playSong(message, connection, song) {
-  const stream = await getStreamFromSpotify(song);
+  const stream = await getStreamFromSpotify(song, message, connection);
   const resource = createAudioResource(stream.stream);
+  player.stop();
   player.play(resource);
   connection.subscribe(player);
-
-  player.prependOnceListener( AudioPlayerStatus.Idle, () => {
+  player.removeAllListeners(AudioPlayerStatus.Idle);
+  player.on( AudioPlayerStatus.Idle, () => {
     const serverQueue = queue.get(message.guild.id);
     serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
@@ -194,9 +196,9 @@ async function playSong(message, connection, song) {
 
   message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
 }
+//fix incorrect youtube url
 
-
-async function getStreamFromSpotify(track) {
+async function getStreamFromSpotify(track, message, connection) {
   const trackInfo = await spotifyApi.getTrack(track.id, { market: 'US' });
   // const trackPreviewUrl = trackInfo.body.preview_url;
   const trackurl = trackInfo.body.external_urls.spotify;
@@ -207,15 +209,25 @@ async function getStreamFromSpotify(track) {
       // let track = await SpottyDL.downloadTrack(results, "output/")
       // console.log(track)
     })
-
+  try {
   const stream = await play.stream("https://www.youtube.com/watch?v="+videoID, {
     discordPlayerCompatibility: true,
     quality: 2,
   })
-
-  
-
   return stream
+  }
+  catch(e) {
+    const serverQueue = queue.get(message.guild.id);
+    serverQueue.songs.shift();
+    if (serverQueue.songs.length > 0) {
+      playSong(message, connection, serverQueue.songs[0]);
+    } else {
+      setTimeout(() => connection.destroy(), 5_000);
+      queue.delete(message.guild.id);
+      message.channel.send('No more songs to play.');
+    }
+    message.channel.send("Song not found, skipping to next track.")
+  }
 }
 
 function shuffle(array) {
