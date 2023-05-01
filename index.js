@@ -7,8 +7,16 @@ const { Readable } = require('stream');
 const SpottyDL = require('spottydl');
 // const { resourceLimits } = require('worker_threads');
 const play = require('play-dl');
+const http = require('http');
 
-
+http.createServer((req, res) => {
+  res.writeHead(200, {
+      'Content-type': 'text/plain'
+  });
+      res.write('Hey');
+      res.end();
+  }).listen(4000);
+  
 // Set up the Discord bot client
 const client = new Client({intents:[
   IntentsBitField.Flags.Guilds,
