@@ -7,16 +7,13 @@ const { Readable } = require('stream');
 const SpottyDL = require('spottydl');
 // const { resourceLimits } = require('worker_threads');
 const play = require('play-dl');
-const http = require('http');
+var http = require('http'); 
 
-http.createServer((req, res) => {
-  res.writeHead(200, {
-      'Content-type': 'text/plain'
-  });
-      res.write('Hey');
-      res.end();
-  }).listen(4000);
-  
+http.createServer(function (req, res) { 
+  res.write("I'm alive"); 
+  res.end(); 
+}).listen(8080);
+
 // Set up the Discord bot client
 const client = new Client({intents:[
   IntentsBitField.Flags.Guilds,
@@ -27,6 +24,7 @@ const client = new Client({intents:[
 
 client.on('ready', () => {
   console.log('The bot is online')
+  activities = [`chill gang`, `with the gang`, `with the gang` ],i = 0; setInterval(() => bot.user.setActivity(`${activities[i++ % activities.length]}`, {type:"STREAMING",url:"https://www.youtube.com/watch?v=DWcJFNfaw9c" }), 5000) 
 })
 
 
