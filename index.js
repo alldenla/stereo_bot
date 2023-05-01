@@ -51,14 +51,24 @@ const player = createAudioPlayer({
 // Define the 'play' command for the bot
 client.on('messageCreate', async (message) => {
   if (!message.content.startsWith('!play')) return;
-  let track = null;
+  let track = [];
+  let playlistName="";
   const query = message.content.slice(6).trim();
-
+  try {
   // Search for tracks on Spotify
   if(query.startsWith('https://')){
-    const trackid = query.split('?')[0].split('/').pop();
-    const searchResults = await spotifyApi.getTrack(trackid, {market: "SG"})
-    track = searchResults.body;
+    const urlArr = query.split('?')[0].split('/');
+    const trackid = urlArr.pop();
+    const linkType = urlArr.pop();
+    if (linkType == "track") {
+    const searchResults = await spotifyApi.getTrack(trackid, {market: "SG"});
+    track.push(searchResults.body);}
+    else if (linkType == "playlist") {
+      const searchResults = await spotifyApi.getPlaylistTracks(trackid, {market: "SG"});
+      const playlist = await spotifyApi.getPlaylist(trackid, {market: "SG"});
+      playlistName=playlist.body.name;
+      searchResults.body.items.forEach(item => track.push(item.track))
+    }
   }
 
   else {const searchResults = await spotifyApi.searchTracks(query, { limit: 1, market: "SG" });
@@ -68,7 +78,8 @@ client.on('messageCreate', async (message) => {
       return;
     }
 
-    track = searchResults.body.tracks.items[0];
+    track.push(searchResults.body.tracks.items[0]);
+    
   }
   // Play the track in the voice channel
   const connection = await joinVoiceChannel({
@@ -85,16 +96,26 @@ client.on('messageCreate', async (message) => {
   
 
   const serverQueue = queue.get(message.guild.id) || { songs: [] };
-  serverQueue.songs.push(track);
+  track.forEach(t=>serverQueue.songs.push(t))
+  // serverQueue.songs.push(track);
   queue.set(message.guild.id, serverQueue);
-  // console.log(serverQueue.songs)
 
-  if (serverQueue.songs.length === 1) {
+  if (serverQueue.songs.length == track.length && playlistName!=="") {
+    playSong(message, connection, serverQueue.songs[0]);
+    message.channel.send(`Added playlist "${playlistName}" to Queue`);
+  }
+  else if (serverQueue.songs.length === 1) {
     playSong(message, connection, serverQueue.songs[0]);
   }
-
+  else if (serverQueue.songs.length > 1 && playlistName!=="") {
+    message.channel.send(`Added playlist "${playlistName}" to Queue`);
+  }
   // Send a message to the Discord channel confirming the track that is now playing
-  if (serverQueue.songs.length > 1) message.channel.send(`Added to Queue: ${track.name} by ${track.artists[0].name}`);
+  else if (serverQueue.songs.length > 1) message.channel.send(`Added to Queue: ${track[0].name} by ${track[0].artists[0].name}`);
+}
+catch(e) {
+  message.channel.send("Please specify a song or link.")
+}
 });
 
 
@@ -134,29 +155,37 @@ client.on('messageCreate', async (message) => {
   player.unpause()
 });
 
+client.on('messageCreate', async (message) => {
+  if (!message.content.startsWith('!shuffle')) return;
+  const serverQueue = queue.get(message.guild.id);
+  const queueArr = JSON.parse(JSON.stringify(serverQueue.songs));
+  queueArr.shift();
+  shuffle(queueArr);
+  serverQueue.songs.splice(1);
+  queueArr.forEach(t=>serverQueue.songs.push(t));
+  console.log("shuffled");
+})
+
+
 
 async function playSong(message, connection, song) {
-  
   const stream = await getStreamFromSpotify(song);
   const resource = createAudioResource(stream.stream);
   player.play(resource);
   connection.subscribe(player);
 
-  player.on( AudioPlayerStatus.Idle, () => {
+  player.prependOnceListener( AudioPlayerStatus.Idle, () => {
     const serverQueue = queue.get(message.guild.id);
-    try{
-    serverQueue.song.shift();
+    serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
       playSong(message, connection, serverQueue.songs[0]);
     } else {
       setTimeout(() => connection.destroy(), 5_000);
       queue.delete(message.guild.id);
-    }}
-    catch(e) {
-      console.log("serverQueue.songs is undefined")
+      message.channel.send('No more songs to play.');
     }
   })
-  console.log(song)
+
   message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
 }
 
@@ -178,8 +207,31 @@ async function getStreamFromSpotify(track) {
     quality: 2,
   })
 
+  
+
   return stream
 }
 
+function shuffle(array) {
+  let currentIndex = array.length,  randomIndex;
+
+  // While there remain elements to shuffle.
+  while (currentIndex != 0) {
+
+    // Pick a remaining element.
+    randomIndex = Math.floor(Math.random() * currentIndex);
+    currentIndex--;
+
+    // And swap it with the current element.
+    [array[currentIndex], array[randomIndex]] = [
+      array[randomIndex], array[currentIndex]];
+  }
+
+  return array;
+}
+
+
+
 // Log in to the Discord bot client
 client.login(process.env.TOKEN);
+
