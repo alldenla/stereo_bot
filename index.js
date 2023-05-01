@@ -102,8 +102,13 @@ client.on('messageCreate', async (message) => {
 
 client.on('messageCreate', async (message) => {
   if (!message.content.startsWith('!stop')) return;
+  try {
   const connection = getVoiceConnection(message.guild.id);
   connection.destroy();
+  queue.delete(message.guild.id);}
+  catch(e) {
+    console.log('No active connections')
+  }
 });
 
 client.on('messageCreate', async (message) => {
