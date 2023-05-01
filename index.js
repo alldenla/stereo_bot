@@ -2,10 +2,10 @@ require('dotenv/config')
 const {Client, IntentsBitField } = require('discord.js');
 const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const SpotifyWebApi = require('spotify-web-api-node');
-const ytdl = require('ytdl-core-discord');
+// const ytdl = require('ytdl-core-discord');
 const { Readable } = require('stream');
 const SpottyDL = require('spottydl');
-const { resourceLimits } = require('worker_threads');
+// const { resourceLimits } = require('worker_threads');
 const play = require('play-dl');
 
 
@@ -59,7 +59,6 @@ client.on('messageCreate', async (message) => {
     const trackid = query.split('?')[0].split('/').pop();
     const searchResults = await spotifyApi.getTrack(trackid, {market: "SG"})
     track = searchResults.body;
-    console.log(track)
   }
 
   else {const searchResults = await spotifyApi.searchTracks(query, { limit: 1, market: "SG" });
@@ -70,7 +69,6 @@ client.on('messageCreate', async (message) => {
     }
 
     track = searchResults.body.tracks.items[0];
-    console.log(track);
   }
   // Play the track in the voice channel
   const connection = await joinVoiceChannel({
@@ -92,11 +90,11 @@ client.on('messageCreate', async (message) => {
   // console.log(serverQueue.songs)
 
   if (serverQueue.songs.length === 1) {
-    playSong(message.guild, connection, serverQueue.songs[0]);
+    playSong(message, connection, serverQueue.songs[0]);
   }
 
   // Send a message to the Discord channel confirming the track that is now playing
-  message.channel.send(`Now playing: ${track.name} by ${track.artists[0].name}`);
+  if (serverQueue.songs.length > 1) message.channel.send(`Added to Queue: ${track.name} by ${track.artists[0].name}`);
 });
 
 
@@ -115,13 +113,14 @@ client.on('messageCreate', async (message) => {
   if (!message.content.startsWith('!next')) return;
   const connection = getVoiceConnection(message.guild.id);
   const serverQueue = queue.get(message.guild.id);
-  serverQueue.songs.splice(0,1);
-  console.log(serverQueue.songs)
+  // if (serverQueue.songs.length > 0) serverQueue.songs.splice(0,1);
+  serverQueue.songs.shift();
   if (serverQueue.songs.length > 0) {
-    playSong(message.guild, connection, serverQueue.songs[0]);
+    playSong(message, connection, serverQueue.songs[0]);
   } else {
     connection.destroy();
-    queue.delete(guild.id);
+    queue.delete(message.guild.id);
+    message.channel.send('No more songs to play.')
   }
 });
 
@@ -136,37 +135,29 @@ client.on('messageCreate', async (message) => {
 });
 
 
-async function playSong(guild, connection, song) {
+async function playSong(message, connection, song) {
   
   const stream = await getStreamFromSpotify(song);
   const resource = createAudioResource(stream.stream);
   player.play(resource);
   connection.subscribe(player);
-  // player.play(resource);
-
-  // const dispatcher = connection.play(stream, { type: 'opus' });
 
   player.on( AudioPlayerStatus.Idle, () => {
-    const serverQueue = queue.get(guild.id);
-    serverQueue.songs.splice(0,1);
-    console.log(serverQueue.songs)
+    const serverQueue = queue.get(message.guild.id);
+    try{
+    serverQueue.song.shift();
     if (serverQueue.songs.length > 0) {
-      playSong(guild, connection, serverQueue.songs[0]);
+      playSong(message, connection, serverQueue.songs[0]);
     } else {
-      setTimeout(() =>   connection.destroy(), 5_000);
-      queue.delete(guild.id);
+      setTimeout(() => connection.destroy(), 5_000);
+      queue.delete(message.guild.id);
+    }}
+    catch(e) {
+      console.log("serverQueue.songs is undefined")
     }
   })
-  // dispatcher.on('finish', () => {
-  //   const serverQueue = queue.get(guild.id);
-  //   serverQueue.songs.shift();
-  //   if (serverQueue.songs.length > 0) {
-  //     playSong(guild, connection, serverQueue.songs[0]);
-  //   } else {
-  //     connection.disconnect();
-  //     queue.delete(guild.id);
-  //   }
-  // });
+  console.log(song)
+  message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
 }
 
 
@@ -182,30 +173,12 @@ async function getStreamFromSpotify(track) {
       // console.log(track)
     })
 
-
-  // const stream = await ytdl("https://www.youtube.com/watch?v="+videoID, {
-  //   filter: 'audioonly',
-  //   highWaterMark: 1 << 25
-  // });
   const stream = await play.stream("https://www.youtube.com/watch?v="+videoID, {
     discordPlayerCompatibility: true,
     quality: 2,
   })
 
   return stream
-  // if (!trackPreviewUrl) {
-  //   const stream = new Readable();
-  //   stream.push(null);
-  //   return stream;
-  // }
-
-  // const stream = await ytdl(trackPreviewUrl, {
-  //   filter: 'audioonly',
-  //   opusEncoded: true,
-  //   highWaterMark: 1 << 25
-  // });
-  
-  // return stream;
 }
 
 // Log in to the Discord bot client
