@@ -198,9 +198,7 @@ async function playSong(message, connection, song) {
   else {
   const resource = createAudioResource(stream.stream);
   player.stop();
-  console.log('player stopped');
   player.play(resource);
-  console.log('resource in player');
   connection.subscribe(player);
   player.removeAllListeners(AudioPlayerStatus.Idle);
   player.on( AudioPlayerStatus.Idle, () => {
@@ -208,6 +206,7 @@ async function playSong(message, connection, song) {
     const serverQueue = queue.get(message.guild.id);
     serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
+      console.log('audio player status')
       playSong(message, connection, serverQueue.songs[0]);
     } else {
       player.stop();
@@ -255,8 +254,8 @@ async function getStreamFromSpotify(track, message, connection) {
     }
     message.channel.send("Song not found, skipping to next track.")
   }
-}
-2
+};
+
 function shuffle(array) {
   let currentIndex = array.length,  randomIndex;
 
