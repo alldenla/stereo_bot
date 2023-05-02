@@ -38,14 +38,20 @@ const spotifyApi = new SpotifyWebApi({
 let spotifyAccessToken = '';
 
 // Log in to the Spotify API and retrieve an access token
-spotifyApi.clientCredentialsGrant()
+function newToken() {spotifyApi.clientCredentialsGrant()
   .then((data) => {
     spotifyAccessToken = data.body.access_token;
     spotifyApi.setAccessToken(spotifyAccessToken);
+    spotifyApi.setRefreshToken(spotifyAccessToken);
+    console.log('access token set')
   })
   .catch((error) => {
     console.log('Error retrieving Spotify access token:', error);
   });
+}
+
+newToken();
+tokenRefreshInterval = setInterval(newToken, 1000 * 60 * 59);
 
 // Set up the music queue
 const queue = new Map();
@@ -55,6 +61,21 @@ const player = createAudioPlayer({
     },
   });
 // Define the 'play' command for the bot
+
+const autoShuffle = true;
+
+client.on('messageCreate', async (message) => {
+  if(!message.content.startsWith('!autoshuffle')) return;
+  if (autoShuffle===true) {
+    autoShuffle=false;
+    message.channel.send('Auto shuffle disabled');
+  }
+  else if (autoShuffle===false) {
+    autoShuffle=true;
+    message.channel.send('Auto shuffle enabled');
+  }
+})
+
 client.on('messageCreate', async (message) => {
   if (!message.content.startsWith('!play')) return;
   let track = [];
@@ -73,6 +94,10 @@ client.on('messageCreate', async (message) => {
       const searchResults = await spotifyApi.getPlaylistTracks(trackid, {market: "SG"});
       const playlist = await spotifyApi.getPlaylist(trackid, {market: "SG"});
       playlistName=playlist.body.name;
+      if(autoShuffle===true) {
+        shuffle(searchResults.body.items);
+        message.channel.send("Auto shuffle is enabled by default. Use '!autoshuffle' to turn off. This will only take effect when you stop and play the playlist again.")
+      }
       searchResults.body.items.forEach(item => track.push(item.track))
     }
   }
@@ -121,6 +146,7 @@ client.on('messageCreate', async (message) => {
 }
 catch(e) {
   message.channel.send("Please specify a song or link.")
+  console.log(e);
 }
 });
 
@@ -138,17 +164,7 @@ client.on('messageCreate', async (message) => {
 
 client.on('messageCreate', async (message) => {
   if (!message.content.startsWith('!next')) return;
-  const connection = getVoiceConnection(message.guild.id);
-  const serverQueue = queue.get(message.guild.id);
-  // if (serverQueue.songs.length > 0) serverQueue.songs.splice(0,1);
-  serverQueue.songs.shift();
-  if (serverQueue.songs.length > 0) {
-    playSong(message, connection, serverQueue.songs[0]);
-  } else {
-    connection.destroy();
-    queue.delete(message.guild.id);
-    message.channel.send('No more songs to play.')
-  }
+  next(message);
 });
 
 client.on('messageCreate', async (message) => {
@@ -176,26 +192,36 @@ client.on('messageCreate', async (message) => {
 
 
 async function playSong(message, connection, song) {
+  console.log("Function: PlaySong");
   const stream = await getStreamFromSpotify(song, message, connection);
+  if (typeof stream === 'undefined') next(message);
+  else {
   const resource = createAudioResource(stream.stream);
   player.stop();
+  console.log('player stopped');
   player.play(resource);
+  console.log('resource in player');
   connection.subscribe(player);
   player.removeAllListeners(AudioPlayerStatus.Idle);
   player.on( AudioPlayerStatus.Idle, () => {
+    console.log("Audio Player Listener");
     const serverQueue = queue.get(message.guild.id);
     serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
       playSong(message, connection, serverQueue.songs[0]);
     } else {
+      player.stop();
       setTimeout(() => connection.destroy(), 5_000);
       queue.delete(message.guild.id);
       message.channel.send('No more songs to play.');
     }
+    
   })
 
   message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
 }
+}
+
 //fix incorrect youtube url
 
 async function getStreamFromSpotify(track, message, connection) {
@@ -214,22 +240,23 @@ async function getStreamFromSpotify(track, message, connection) {
     discordPlayerCompatibility: true,
     quality: 2,
   })
-  return stream
+    return stream
   }
   catch(e) {
     const serverQueue = queue.get(message.guild.id);
     serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
+      player.removeAllListeners(AudioPlayerStatus.Idle);
       playSong(message, connection, serverQueue.songs[0]);
     } else {
+      player.stop();
       setTimeout(() => connection.destroy(), 5_000);
       queue.delete(message.guild.id);
-      message.channel.send('No more songs to play.');
     }
     message.channel.send("Song not found, skipping to next track.")
   }
 }
-
+2
 function shuffle(array) {
   let currentIndex = array.length,  randomIndex;
 
@@ -246,8 +273,21 @@ function shuffle(array) {
   }
 
   return array;
-}
+};
 
+function next(message) {
+  const connection = getVoiceConnection(message.guild.id);
+  const serverQueue = queue.get(message.guild.id);
+  serverQueue.songs.shift();
+  if (serverQueue.songs.length > 0) {
+    playSong(message, connection, serverQueue.songs[0]);
+  } else {
+    player.stop();
+    connection.destroy();
+    queue.delete(message.guild.id);
+    message.channel.send('No more songs to play.')
+  }
+};
 
 
 // Log in to the Discord bot client
