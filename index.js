@@ -255,7 +255,7 @@ async function getStreamFromSpotify(track, message, connection) {
       videoID = results.id;
       // let track = await SpottyDL.downloadTrack(results, "output/")
       // console.log(track)
-      console.log(`The track URL is ${trackurl}, the video is is ${videoID}`)
+      console.log(`The track URL is ${trackurl}, the video is is ${videoID}. Song is ${track.name}`)
     })
   try {
   const stream = await play.stream("https://music.youtube.com/watch?v="+videoID, {
@@ -270,6 +270,7 @@ async function getStreamFromSpotify(track, message, connection) {
     serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
       message.channel.send(`${songName} not found, skipping to next track.`)
+      console.log(`${songName} not found`)
       getStreamFromSpotify(serverQueue.songs[0], message, connection);
     } else {
       player.stop();
