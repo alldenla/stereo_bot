@@ -12,6 +12,9 @@ http.createServer(function (req, res) {
   res.end(); 
 }).listen(8080);
 
+const io = new WebSocket.Server({ noServer: true });
+global.io = new WebSocket.Server({ noServer: true });
+
 // Set up the Discord bot client
 const client = new Client({intents:[
   IntentsBitField.Flags.Guilds,
