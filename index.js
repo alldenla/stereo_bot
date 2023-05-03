@@ -1,5 +1,5 @@
 require('dotenv/config');
-const WebSocket = require('ws');
+// const WebSocket = require('ws');
 const {Client, IntentsBitField } = require('discord.js');
 const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const SpotifyWebApi = require('spotify-web-api-node');
@@ -13,8 +13,8 @@ http.createServer(function (req, res) {
   res.end(); 
 }).listen(8080);
 
-const io = new WebSocket.Server({ noServer: true });
-global.io = new WebSocket.Server({ noServer: true });
+// const io = new WebSocket.Server({ noServer: true });
+// global.io = new WebSocket.Server({ noServer: true });
 
 // Set up the Discord bot client
 const client = new Client({intents:[
