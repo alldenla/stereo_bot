@@ -201,10 +201,24 @@ async function playSong(message, connection, song) {
   if (typeof stream === 'undefined') next(message);
   else {
   const resource = await createAudioResource(stream.stream);
+  try {
   player.stop();
   message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
   connection.subscribe(player);
   player.play(resource);
+  }
+  catch(e) {
+    console.log(e);
+    player.stop();
+    const player = createAudioPlayer({
+      behaviours: {
+        noSubscriber: NoSubscriberBehavior.Pause,
+      },
+    });
+    message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
+    connection.subscribe(player);
+    player.play(resource);
+  }
   player.removeAllListeners(AudioPlayerStatus.Idle);
   player.on( AudioPlayerStatus.Idle, () => {
     console.log("Audio Player Listener");
