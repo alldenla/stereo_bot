@@ -39,7 +39,7 @@ spotifyApi.clientCredentialsGrant()
   .then((data) => {
     spotifyAccessToken = data.body.access_token;
     spotifyApi.setAccessToken(spotifyAccessToken);
-    console.log('access token set')
+    console.log('Access token set')
   })
   .catch((error) => {
     console.log('Error retrieving Spotify access token:', error);
@@ -49,7 +49,7 @@ function refreshToken() {spotifyApi.clientCredentialsGrant()
   .then((data) => {
     spotifyAccessToken = data.body.access_token;
     spotifyApi.setRefreshToken(spotifyAccessToken);
-    console.log('access token set')
+    console.log('Refresh token set')
   })
   .catch((error) => {
     console.log('Error retrieving Spotify access token:', error);
@@ -197,7 +197,6 @@ client.on('messageCreate', async (message) => {
 
 
 async function playSong(message, connection, song) {
-  console.log("Function: PlaySong");
   const stream = await getStreamFromSpotify(song, message, connection);
   if (typeof stream === 'undefined') next(message);
   else {
@@ -238,9 +237,10 @@ async function getStreamFromSpotify(track, message, connection) {
       videoID = results.id;
       // let track = await SpottyDL.downloadTrack(results, "output/")
       // console.log(track)
+      console.log(`The track URL is ${trackurl}, the video is is ${videoID}`)
     })
   try {
-  const stream = await play.stream("https://www.youtube.com/watch?v="+videoID, {
+  const stream = await play.stream("https://music.youtube.com/watch?v="+videoID, {
     discordPlayerCompatibility: true,
     quality: 2,
   })
@@ -248,15 +248,18 @@ async function getStreamFromSpotify(track, message, connection) {
   }
   catch(e) {
     const serverQueue = queue.get(message.guild.id);
+    let songName = serverQueue.songs[0].name;
     serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
+      message.channel.send(`${songName} not found, skipping to next track.`)
       getStreamFromSpotify(serverQueue.songs[0], message, connection);
     } else {
       player.stop();
       setTimeout(() => connection.destroy(), 5_000);
       queue.delete(message.guild.id);
+      message.channel.send('No more songs to play.')
     }
-    message.channel.send("Song not found, skipping to next track.")
+    
   }
 };
 
