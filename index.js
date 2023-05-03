@@ -309,10 +309,6 @@ function next(message) {
   }
 };
 
-process.on("multipleResolves", (type, promise, reason) => {
-  if (reason.toLocaleString() === "Error: Cannot perform IP discovery - socket closed") return;
-})
-
 // Log in to the Discord bot client
 client.login(process.env.TOKEN);
 
