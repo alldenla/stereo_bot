@@ -1,11 +1,9 @@
-require('dotenv/config')
+require('dotenv/config');
 const {Client, IntentsBitField } = require('discord.js');
 const { joinVoiceChannel, getVoiceConnection, createAudioPlayer, NoSubscriberBehavior, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require('@discordjs/voice');
 const SpotifyWebApi = require('spotify-web-api-node');
-// const ytdl = require('ytdl-core-discord');
 const { Readable } = require('stream');
 const SpottyDL = require('spottydl');
-// const { resourceLimits } = require('worker_threads');
 const play = require('play-dl');
 var http = require('http'); 
 
@@ -23,8 +21,7 @@ const client = new Client({intents:[
 ]});
 
 client.on('ready', () => {
-  console.log('The bot is online')
-  activities = [`chill gang`, `with the gang`, `with the gang` ],i = 0; setInterval(() => client.user.setActivity(`${activities[i++ % activities.length]}`, {type:"STREAMING",url:"https://www.youtube.com/watch?v=DWcJFNfaw9c" }), 5000) 
+  console.log('The bot is online'); 
 })
 
 
@@ -42,7 +39,6 @@ function newToken() {spotifyApi.clientCredentialsGrant()
   .then((data) => {
     spotifyAccessToken = data.body.access_token;
     spotifyApi.setAccessToken(spotifyAccessToken);
-    spotifyApi.setRefreshToken(spotifyAccessToken);
     console.log('access token set')
   })
   .catch((error) => {
@@ -51,7 +47,7 @@ function newToken() {spotifyApi.clientCredentialsGrant()
 }
 
 newToken();
-tokenRefreshInterval = setInterval(newToken, 1000 * 60 * 59);
+tokenRefreshInterval = setInterval(newToken, 1000 * 60 * 14);
 
 // Set up the music queue
 const queue = new Map();
@@ -196,7 +192,7 @@ async function playSong(message, connection, song) {
   const stream = await getStreamFromSpotify(song, message, connection);
   if (typeof stream === 'undefined') next(message);
   else {
-  const resource = createAudioResource(stream.stream);
+  const resource = await createAudioResource(stream.stream);
   player.stop();
   player.play(resource);
   connection.subscribe(player);
@@ -245,8 +241,7 @@ async function getStreamFromSpotify(track, message, connection) {
     const serverQueue = queue.get(message.guild.id);
     serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
-      player.removeAllListeners(AudioPlayerStatus.Idle);
-      playSong(message, connection, serverQueue.songs[0]);
+      getStreamFromSpotify(serverQueue.songs[0], message, connection);
     } else {
       player.stop();
       setTimeout(() => connection.destroy(), 5_000);
