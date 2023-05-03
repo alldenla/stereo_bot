@@ -35,7 +35,7 @@ const spotifyApi = new SpotifyWebApi({
 let spotifyAccessToken = '';
 
 // Log in to the Spotify API and retrieve an access token
-function newToken() {spotifyApi.clientCredentialsGrant()
+spotifyApi.clientCredentialsGrant()
   .then((data) => {
     spotifyAccessToken = data.body.access_token;
     spotifyApi.setAccessToken(spotifyAccessToken);
@@ -44,10 +44,19 @@ function newToken() {spotifyApi.clientCredentialsGrant()
   .catch((error) => {
     console.log('Error retrieving Spotify access token:', error);
   });
-}
 
-newToken();
-tokenRefreshInterval = setInterval(newToken, 1000 * 60 * 14);
+function refreshToken() {spotifyApi.clientCredentialsGrant()
+  .then((data) => {
+    spotifyAccessToken = data.body.access_token;
+    spotifyApi.setRefreshToken(spotifyAccessToken);
+    console.log('access token set')
+  })
+  .catch((error) => {
+    console.log('Error retrieving Spotify access token:', error);
+  });
+};
+
+tokenRefreshInterval = setInterval(refreshToken, 1000 * 60 * 14);
 
 // Set up the music queue
 const queue = new Map();
@@ -194,8 +203,9 @@ async function playSong(message, connection, song) {
   else {
   const resource = await createAudioResource(stream.stream);
   player.stop();
-  player.play(resource);
+  message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
   connection.subscribe(player);
+  player.play(resource);
   player.removeAllListeners(AudioPlayerStatus.Idle);
   player.on( AudioPlayerStatus.Idle, () => {
     console.log("Audio Player Listener");
@@ -212,8 +222,7 @@ async function playSong(message, connection, song) {
     }
     
   })
-
-  message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
+  
 }
 }
 
