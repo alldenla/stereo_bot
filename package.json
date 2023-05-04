@@ -6,6 +6,7 @@
     "ffmpeg-static": "^5.1.0",
     "libsodium": "^0.7.11",
     "play-dl": "^1.9.6",
+    "sodium-native": "^4.0.1",
     "spotify-web-api-node": "^5.0.2",
     "spottydl": "^0.2.2",
     "superagent": "^8.0.9",
