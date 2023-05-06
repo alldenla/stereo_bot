@@ -198,6 +198,7 @@ client.on('messageCreate', async (message) => {
 
 async function playSong(message, connection, song) {
   const stream = await getStreamFromSpotify(song, message, connection);
+  console.log('stream received');
   let player = createAudioPlayer({
     behaviours: {
       noSubscriber: NoSubscriberBehavior.Pause,
@@ -211,8 +212,8 @@ async function playSong(message, connection, song) {
   
   if (typeof stream === 'undefined') {
     console.log('stream undefined');
-    player.removeAllListeners(AudioPlayerStatus.Idle);
-    next(message);
+    // player.removeAllListeners(AudioPlayerStatus.Idle);
+    // next(message);
   }
   else {
   const resource = await createAudioResource(stream.stream, {
@@ -287,16 +288,15 @@ async function getStreamFromSpotify(track, message, connection) {
     let songName = serverQueue.songs[0].name;
     serverQueue.songs.shift();
     if (serverQueue.songs.length > 0) {
-      message.channel.send(`${songName} not found, skipping to next track.`)
+      message.channel.send(`Something went wrong trying to play ${songName}, skipping to next track.`)
       console.log(`${songName} not found`)
-      getStreamFromSpotify(serverQueue.songs[0], message, connection);
+      playSong(message, connection, serverQueue.songs[0]);
     } else {
       player.stop();
       setTimeout(() => connection.destroy(), 5_000);
       queue.delete(message.guild.id);
       message.channel.send('No more songs to play.')
     }
-    
   }
 };
 
