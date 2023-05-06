@@ -7,11 +7,10 @@ const { Readable } = require('stream');
 const SpottyDL = require('spottydl');
 const play = require('play-dl');
 var http = require('http'); 
-
-http.createServer(function (req, res) { 
-  res.write("I'm alive"); 
-  res.end(); 
-}).listen(8080);
+const express = require("express");
+const app = express();
+const server = app.listen(8080);
+server.keepAliveTimeout = 61 * 1000;
 
 // const io = new WebSocket.Server({ noServer: true });
 // global.io = new WebSocket.Server({ noServer: true });
@@ -53,6 +52,7 @@ function refreshToken() {spotifyApi.clientCredentialsGrant()
   .then((data) => {
     spotifyAccessToken = data.body.access_token;
     spotifyApi.setRefreshToken(spotifyAccessToken);
+    spotifyApi.setAccessToken(spotifyAccessToken);
     console.log('Refresh token set')
   })
   .catch((error) => {
@@ -64,15 +64,11 @@ tokenRefreshInterval = setInterval(refreshToken, 1000 * 60 * 14);
 
 // Set up the music queue
 const queue = new Map();
-const player = createAudioPlayer({
-    behaviours: {
-      noSubscriber: NoSubscriberBehavior.Pause,
-    },
-  });
+
 // Define the 'play' command for the bot
 
 const autoShuffle = true;
-
+let audioPlayerError = false;
 client.on('messageCreate', async (message) => {
   if(!message.content.startsWith('!autoshuffle')) return;
   if (autoShuffle===true) {
@@ -186,6 +182,7 @@ client.on('messageCreate', async (message) => {
   player.unpause()
 });
 
+
 client.on('messageCreate', async (message) => {
   if (!message.content.startsWith('!shuffle')) return;
   const serverQueue = queue.get(message.guild.id); // this is block level, it will make it undefined
@@ -196,35 +193,59 @@ client.on('messageCreate', async (message) => {
   queueArr.forEach(t=>serverQueue.songs.push(t));
   console.log("shuffled");
   message.channel.send('Shuffled the Queue.')
-})
-
+});
 
 
 async function playSong(message, connection, song) {
   const stream = await getStreamFromSpotify(song, message, connection);
-  if (typeof stream === 'undefined') next(message);
+  let player = createAudioPlayer({
+    behaviours: {
+      noSubscriber: NoSubscriberBehavior.Pause,
+    },
+  });
+  player.removeAllListeners('error');
+  player.on('error', (error) =>{
+    console.log(error);
+    audioPlayerError = true;
+  });
+  
+  if (typeof stream === 'undefined') {
+    console.log('stream undefined');
+    player.removeAllListeners(AudioPlayerStatus.Idle);
+    next(message);
+  }
   else {
-  const resource = await createAudioResource(stream.stream);
+  const resource = await createAudioResource(stream.stream, {
+    inputType: stream.type
+  });
   try {
-  player.stop();
   message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
   connection.subscribe(player);
   player.play(resource);
   }
   catch(e) {
     console.log(e);
-    player.stop();
-    const player = createAudioPlayer({
-      behaviours: {
-        noSubscriber: NoSubscriberBehavior.Pause,
-      },
-    });
     message.channel.send(`Now playing: ${song.name} by ${song.artists[0].name}`);
     connection.subscribe(player);
     player.play(resource);
   }
   player.removeAllListeners(AudioPlayerStatus.Idle);
   player.on( AudioPlayerStatus.Idle, () => {
+    if (audioPlayerError == true) {
+      const serverQueue = queue.get(message.guild.id);
+      if (serverQueue.songs.length > 0) {
+        console.log('audio player status')
+        playSong(message, connection, serverQueue.songs[0]);
+      } else {
+        player.stop();
+        setTimeout(() => connection.destroy(), 5_000);
+        queue.delete(message.guild.id);
+        message.channel.send('No more songs to play.');
+      }
+      audioPlayerError = false;
+    }
+    else{
+    player.stop();
     console.log("Audio Player Listener");
     const serverQueue = queue.get(message.guild.id);
     serverQueue.songs.shift();
@@ -237,15 +258,13 @@ async function playSong(message, connection, song) {
       queue.delete(message.guild.id);
       message.channel.send('No more songs to play.');
     }
-    
-  })
-  
-}
-}
-
-//fix incorrect youtube url
+  }
+  }) 
+};
+}; 
 
 async function getStreamFromSpotify(track, message, connection) {
+  
   const trackInfo = await spotifyApi.getTrack(track.id, { market: 'US' });
   // const trackPreviewUrl = trackInfo.body.preview_url;
   const trackurl = trackInfo.body.external_urls.spotify;
@@ -253,8 +272,6 @@ async function getStreamFromSpotify(track, message, connection) {
   await SpottyDL.getTrack(trackurl)
     .then(async(results) => {
       videoID = results.id;
-      // let track = await SpottyDL.downloadTrack(results, "output/")
-      // console.log(track)
       console.log(`The track URL is ${trackurl}, the video is is ${videoID}. Song is ${track.name}`)
     })
   try {
@@ -265,6 +282,7 @@ async function getStreamFromSpotify(track, message, connection) {
     return stream
   }
   catch(e) {
+    console.log(e);
     const serverQueue = queue.get(message.guild.id);
     let songName = serverQueue.songs[0].name;
     serverQueue.songs.shift();
@@ -300,11 +318,12 @@ function shuffle(array) {
   return array;
 };
 
-function next(message) {
+async function next(message) {
   const connection = getVoiceConnection(message.guild.id);
   const serverQueue = queue.get(message.guild.id);
   serverQueue.songs.shift();
   if (serverQueue.songs.length > 0) {
+    console.log('next');
     playSong(message, connection, serverQueue.songs[0]);
   } else {
     player.stop();
