@@ -6,11 +6,8 @@ const SpotifyWebApi = require('spotify-web-api-node');
 const { Readable } = require('stream');
 const SpottyDL = require('spottydl');
 const play = require('play-dl');
-var http = require('http'); 
-const express = require("express");
-const app = express();
-const server = app.listen(8080);
-server.keepAliveTimeout = 61 * 1000;
+
+var http = require('http'); http.createServer(function (req, res) { res.write("I'm alive"); res.end(); }).listen(8080);
 
 // const io = new WebSocket.Server({ noServer: true });
 // global.io = new WebSocket.Server({ noServer: true });
